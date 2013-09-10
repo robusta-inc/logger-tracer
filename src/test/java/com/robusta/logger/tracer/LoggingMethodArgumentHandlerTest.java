@@ -2,42 +2,100 @@ package com.robusta.logger.tracer;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mock;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+import static com.robusta.logger.tracer.LoggingMethodArgumentHandler.METHOD_ARGUMENT_TRACE_LOG_MESSAGE;
+import static java.util.UUID.randomUUID;
+import static org.mockito.Mockito.*;
+import static org.mockito.MockitoAnnotations.initMocks;
+
+@SuppressWarnings("ALL")
 public class LoggingMethodArgumentHandlerTest {
+    public static final ArrayList<Object> NO_ARG_LIST = new ArrayList<Object>();
     private LoggingMethodArgumentHandler argumentHandler;
-    private Logger logger;
+    @Mock private Logger logger;
     private String methodName;
-    private List<String> anArrayList;
     private Object aNull;
-    private Bean aBean;
+    private Object[] methodArguments;
+    private ArrayList<Object> methodArgumentsAsArrayList;
+    private String uuid;
 
     @Before
     public void setUp() throws Exception {
+        initMocks(this);
         methodName = "LoggingMethodArgumentHandlerTest.someMethod";
-        logger = LoggerFactory.getLogger("LoggingMethodArgumentHandlerTest");
-        argumentHandler = new LoggingMethodArgumentHandler(logger, methodName);
-        anArrayList = new ArrayList<String>();
-        aBean = new Bean();
+        uuid = randomUUID().toString();
+        argumentHandler = new LoggingMethodArgumentHandler(logger, methodName, uuid);
+        List<String> anArrayList = new ArrayList<String>();
+        Bean aBean = new Bean();
+        methodArguments = new Object[]{1L, "AString", anArrayList, aNull, aBean};
+        methodArgumentsAsArrayList = newArrayList(1L, "AString", anArrayList, aNull, aBean);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInitialization_whenLoggerIsInvalid_shouldRaiseException() throws Exception {
+        new LoggingMethodArgumentHandler(null, methodName, uuid);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInitialization_whenMethodNameIsInvalid_shouldRaiseException() throws Exception {
+        new LoggingMethodArgumentHandler(logger, null, uuid);
     }
 
     @Test
     public void testDoWithMethodArguments_whenNoArgumentsSpecified() throws Exception {
-        argumentHandler.doWithMethodArguments(null);
+        expectingIsTraceEnabledCallOnTheLogger_willReturn(true);
+        argumentHandler.doWithMethodArguments();
+        verifyThatMessageIsLoggedAtTraceLevelWithMethodArguments(NO_ARG_LIST);
+    }
+
+    private void verifyThatMessageIsLoggedAtTraceLevelWithMethodArguments(ArrayList<Object> argumentList) {
+        verify(logger).isTraceEnabled();
+        verify(logger).trace(METHOD_ARGUMENT_TRACE_LOG_MESSAGE, uuid, methodName, argumentList);
+        verifyNoMoreInteractions(logger);
+    }
+
+    private void expectingIsTraceEnabledCallOnTheLogger_willReturn(boolean enabled) {
+        when(logger.isTraceEnabled()).thenReturn(enabled);
     }
 
     @Test
     public void testDoWithMethodArguments_whenEmptyArrayArgumentsSpecified() throws Exception {
+        expectingIsTraceEnabledCallOnTheLogger_willReturn(true);
         argumentHandler.doWithMethodArguments(new Object[]{});
+        verifyThatMessageIsLoggedAtTraceLevelWithMethodArguments(NO_ARG_LIST);
     }
 
     @Test
     public void testDoWithMethodArguments_whenSomeArguments() throws Exception {
-        argumentHandler.doWithMethodArguments(1L, "AString", anArrayList, aNull, aBean);
+        expectingIsTraceEnabledCallOnTheLogger_willReturn(true);
+        argumentHandler.doWithMethodArguments(methodArguments);
+        verifyThatMessageIsLoggedAtTraceLevelWithMethodArguments(methodArgumentsAsArrayList);
+    }
+
+    @Test
+    public void testTraceLevelIsNotEnabledOnLogger_shouldBeANoOp() throws Exception {
+        expectingIsTraceEnabledCallOnTheLogger_willReturn(false);
+        argumentHandler.doWithMethodArguments(methodArguments);
+        verifyThatNoInteractionsOnLogger();
+    }
+
+    private void verifyThatNoInteractionsOnLogger() {
+        verify(logger).isTraceEnabled();
+        verifyNoMoreInteractions(logger);
+    }
+
+    protected static <T> ArrayList<T> newArrayList(T... elements) {
+        ArrayList<T> arrayList = new ArrayList<T>();
+        if(elements != null) {
+            Collections.addAll(arrayList, elements);
+        }
+        return arrayList;
     }
 
     private class Bean {

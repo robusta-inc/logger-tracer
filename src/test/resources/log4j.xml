@@ -15,6 +15,10 @@
         <level value="TRACE" />
         <appender-ref ref="stdout" />
     </logger>
+    <logger name="AsyncLoggingMethodArgumentHandlerTest" additivity="false">
+        <level value="TRACE" />
+        <appender-ref ref="stdout" />
+    </logger>
     <logger name="LOGGER_TRACER" additivity="false">
         <level value="ERROR" />
         <appender-ref ref="stdout" />
